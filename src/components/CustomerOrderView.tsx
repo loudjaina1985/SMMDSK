@@ -118,7 +118,11 @@ export default function CustomerOrderView({ merchantData }: CustomerOrderViewPro
       .map((item) => `- ${item.product.name} x${item.qty} (${formatCurrency(item.product.sellPrice * item.qty, currency, 'en')})`)
       .join('\n');
 
-    const messagePayload = `🛒 *طلب جديد من متجر ${storeName}*
+    const itemsTextHtml = cart
+      .map((item) => `• ${item.product.name} <b>x${item.qty}</b> (${formatCurrency(item.product.sellPrice * item.qty, currency, 'en')})`)
+      .join('\n');
+
+    const messagePayloadWhatsApp = `🛒 *طلب جديد من متجر ${storeName}*
 ------------------------------
 *اسم الزبون:* ${name}
 *رقم الهاتف:* ${phone}
@@ -130,20 +134,41 @@ ${itemsText}
 *إجمالي السعر:* ${formatCurrency(totalCartAmount, currency, 'en')}
 *رمز مرجع الطلب:* ${orderId}`;
 
+    const messagePayloadTelegramHtml = `🛒 <b>طلب جديد من متجر ${storeName}</b>
+------------------------------
+<b>اسم الزبون:</b> ${name}
+<b>رقم الهاتف:</b> ${phone}
+<b>العنوان:</b> ${address}
+------------------------------
+<b>المنتجات المتميزة:</b>
+${itemsTextHtml}
+------------------------------
+<b>إجمالي السعر:</b> ${formatCurrency(totalCartAmount, currency, 'en')}
+<b>رمز مرجع الطلب:</b> <code>${orderId}</code>`;
+
+    // Package the actual items for perfect database synchronization without placeholder fallback
+    const simplifiedItems = cart.map((item) => ({
+      productId: item.product.id,
+      name: item.product.name,
+      quantity: item.qty,
+      price: item.product.sellPrice,
+    }));
+    const itemsBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(simplifiedItems))));
+
     let telegramSent = false;
 
     // Send to Telegram Bot if configured
     if (botToken && chatId) {
       try {
-        const confirmUrl = `${window.location.origin}${window.location.pathname}?action=confirmOrder&id=${orderId}&name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&address=${encodeURIComponent(address)}`;
+        const confirmUrl = `${window.location.origin}${window.location.pathname}?action=confirmOrder&id=${orderId}&name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&address=${encodeURIComponent(address)}&itemsData=${encodeURIComponent(itemsBase64)}&total=${totalCartAmount}`;
         const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: chatId,
-            text: messagePayload,
-            parse_mode: 'Markdown',
+            text: messagePayloadTelegramHtml,
+            parse_mode: 'HTML',
             reply_markup: {
               inline_keyboard: [
                 [
@@ -166,7 +191,7 @@ ${itemsText}
 
     // Prepare WhatsApp message redirect
     const waPhone = phone.replace(/[^0-9+]/g, '');
-    const encodedMsg = encodeURIComponent(messagePayload);
+    const encodedMsg = encodeURIComponent(messagePayloadWhatsApp);
     const whatsappUrl = `https://wa.me/?text=${encodedMsg}`;
 
     setIsSubmitting(false);

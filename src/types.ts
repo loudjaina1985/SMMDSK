@@ -49,6 +49,10 @@ export interface Settings {
   telegramBotToken: string;
   telegramChatId: string;
   currency: string;
+  adminUsername?: string;
+  adminPassword?: string;
+  employeeUsername?: string;
+  employeePassword?: string;
 }
 
 export type SubscriptionPlan = 'trial' | 'basic' | 'professional' | 'enterprise';

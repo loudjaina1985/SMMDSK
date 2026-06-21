@@ -24,6 +24,8 @@ export default function Orders({
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'delivered' | 'cancelled'>('all');
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'telegram' | 'storefront' | 'manual'>('all');
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
 
   // Manual Order Creation State
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
@@ -81,16 +83,27 @@ export default function Orders({
     setPastedText('');
   };
 
-  const filteredOrders = state.orders.filter((o) => {
-    const term = search.toLowerCase();
-    const matchesSearch =
-      o.id.toLowerCase().includes(term) ||
-      o.customerName.toLowerCase().includes(term) ||
-      o.customerPhone.includes(term);
+  const filteredOrders = state.orders
+    .filter((o) => {
+      const term = search.toLowerCase();
+      const matchesSearch =
+        o.id.toLowerCase().includes(term) ||
+        o.customerName.toLowerCase().includes(term) ||
+        o.customerPhone.includes(term);
 
-    const matchesTab = activeTab === 'all' || o.status === activeTab;
-    return matchesSearch && matchesTab;
-  });
+      const matchesTab = activeTab === 'all' || o.status === activeTab;
+      const matchesSource = sourceFilter === 'all' || o.source === sourceFilter;
+      return matchesSearch && matchesTab && matchesSource;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt || '').getTime();
+      const dateB = new Date(b.createdAt || '').getTime();
+      if (sortBy === 'date-desc') return dateB - dateA;
+      if (sortBy === 'date-asc') return dateA - dateB;
+      if (sortBy === 'amount-desc') return b.totalAmount - a.totalAmount;
+      if (sortBy === 'amount-asc') return a.totalAmount - b.totalAmount;
+      return 0;
+    });
 
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
@@ -539,16 +552,52 @@ ${itemsSummary}
 
       {/* SEARCH AND GRID */}
       <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-xs space-y-4">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="ابحث برقم الطلب، اسم العميل، برقم الهاتف..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-right"
-            dir="rtl"
-          />
-          <Search className="absolute right-3 top-3 w-4 h-4 text-slate-400" />
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="ابحث برقم الطلب، اسم العميل، برقم الهاتف..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200/60 rounded-2xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-right"
+              dir="rtl"
+            />
+            <Search className="absolute right-3.5 top-3.5 w-4 h-4 text-slate-400" />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {/* Filter by Source */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/60 rounded-2xl px-3 py-1">
+              <span className="text-[10px] font-bold text-slate-400">المنشأ:</span>
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as any)}
+                className="bg-transparent border-none text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                dir="rtl"
+              >
+                <option value="all">الكل 📦</option>
+                <option value="telegram">تيليجرام 💬</option>
+                <option value="storefront">المتجر 🛒</option>
+                <option value="manual">يدوي ✍️</option>
+              </select>
+            </div>
+
+            {/* Sort Order */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/60 rounded-2xl px-3 py-1">
+              <span className="text-[10px] font-bold text-slate-400">الترتيب:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent border-none text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                dir="rtl"
+              >
+                <option value="date-desc">الأحدث أولاً 🕒</option>
+                <option value="date-asc">الأقدم أولاً 📅</option>
+                <option value="amount-desc">القيمة الأكبر 💰</option>
+                <option value="amount-asc">القيمة الأصغر 📉</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, Trash2, Edit, AlertCircle, RefreshCw, Eye, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Plus, Search, Trash2, Edit, AlertCircle, RefreshCw, Eye, Check, Upload } from 'lucide-react';
 import { Product, AppState } from '../types';
 import { translations } from '../translations';
 import { generateBarcode, formatCurrency } from '../utils';
@@ -24,6 +24,69 @@ export default function Products({ state, t, onSaveProduct, onDeleteProduct }: P
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const compressAndSetImage = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const MAX_DIM = 250;
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setEditingProduct((prev) => prev ? { ...prev, image: compressedBase64 } : null);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      compressAndSetImage(file);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      compressAndSetImage(file);
+    }
+  };
 
   const filteredProducts = state.products.filter((p) => {
     const term = search.toLowerCase();
@@ -310,28 +373,79 @@ export default function Products({ state, t, onSaveProduct, onDeleteProduct }: P
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-500">{t.minStock} *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={editingProduct.minStockLevel ?? 2}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, minStockLevel: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white font-mono text-right"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-500">{t.minStock} *</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={editingProduct.minStockLevel ?? 2}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, minStockLevel: Number(e.target.value) })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white font-mono text-right"
+                />
+              </div>
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-500">{t.productImage}</label>
-                  <input
-                    type="text"
-                    value={editingProduct.image || ''}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
-                    placeholder="رابط صورة خارجي"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-right"
-                  />
+              {/* Product Image Section: Upload (Drag & Drop / Click) or URL */}
+              <div className="space-y-2 pt-2 border-t border-dashed border-slate-150">
+                <label className="block text-xs font-black text-slate-600">🌅 صورة المنتج (تحميل ملف أو رابط)</label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* File Upload Dropzone */}
+                  <div 
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all duration-200 ${
+                      isDragging 
+                        ? 'border-indigo-500 bg-indigo-50/50 scale-[0.98]' 
+                        : 'border-slate-200 dark:border-slate-700/60 hover:border-indigo-400 bg-slate-50/50 dark:bg-slate-800/20 hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                    }`}
+                  >
+                    <input 
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <Upload className="w-6 h-6 text-indigo-500" />
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">تحميل ملف من جهازك 📁</span>
+                    <span className="text-[9px] text-slate-400 font-medium font-bold">اسحب وأسقط الصورة هنا، أو اضغط للاختيار</span>
+                  </div>
+
+                  {/* Image Link Input and Preview */}
+                  <div className="flex flex-col justify-between p-3.5 bg-slate-50 dark:bg-slate-800/10 border border-slate-150 dark:border-slate-800 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-3">
+                      {editingProduct.image && (
+                        <img 
+                          src={editingProduct.image} 
+                          alt="Preview" 
+                          className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-xs flex-shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <span className="text-[9px] font-bold text-slate-400 block text-right">رابط عنوان الصورة / Base64</span>
+                        <input
+                          type="text"
+                          value={editingProduct.image || ''}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                          placeholder="ضع رابط صورة خارجي..."
+                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-805 border border-slate-200 dark:border-slate-700 rounded-lg text-[9px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-left"
+                        />
+                      </div>
+                    </div>
+                    {editingProduct.image && editingProduct.image.startsWith('data:') ? (
+                      <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-black self-end bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-md">
+                        ✓ صورة مرفوعة محلياً
+                      </span>
+                    ) : editingProduct.image ? (
+                      <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-black self-end bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded-md">
+                        ✓ صورة نشطة من رابط
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 

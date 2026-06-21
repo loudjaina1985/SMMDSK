@@ -26,6 +26,12 @@ export default function SettingsPage({
   const [lang, setLang] = useState<AppLanguage>(state.settings.primaryLanguage || 'ar');
   const [importStatus, setImportStatus] = useState<{ success: boolean; msg: string } | null>(null);
 
+  const [adminUsername, setAdminUsername] = useState(state.settings.adminUsername || 'admin');
+  const [adminPassword, setAdminPassword] = useState(state.settings.adminPassword || 'admin123');
+  const [employeeUsername, setEmployeeUsername] = useState(state.settings.employeeUsername || 'employee');
+  const [employeePassword, setEmployeePassword] = useState(state.settings.employeePassword || 'staff123');
+  const [credentialsSavedMsg, setCredentialsSavedMsg] = useState(false);
+
   const handleSaveGeneral = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveGeneralSettings({
@@ -33,6 +39,20 @@ export default function SettingsPage({
       currency,
       primaryLanguage: lang,
     });
+  };
+
+  const handleSaveCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSaveGeneralSettings({
+      adminUsername,
+      adminPassword,
+      employeeUsername,
+      employeePassword,
+    });
+    setCredentialsSavedMsg(true);
+    setTimeout(() => {
+      setCredentialsSavedMsg(false);
+    }, 4000);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,6 +173,86 @@ export default function SettingsPage({
                 <span>الوضع الليلي (Dark)</span>
               </button>
             </div>
+          </div>
+
+          {/* Security Credentials Section */}
+          <div className="pt-6 border-t border-slate-100 space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 border-b border-dashed pb-1 flex items-center gap-1.5 justify-end">
+              <span>إعدادات أمان وحسابات الدخول</span>
+              <Shield className="w-4 h-4 text-indigo-600" />
+            </h3>
+            
+            <form onSubmit={handleSaveCredentials} className="space-y-4">
+              <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200/40 space-y-3 text-right">
+                <span className="text-xs font-black text-indigo-600 block">👤 حساب المدير (Admin)</span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500">اسم المستخدم</label>
+                    <input
+                      type="text"
+                      required
+                      value={adminUsername}
+                      onChange={(e) => setAdminUsername(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 text-right focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500">كلمة المرور الجديدة</label>
+                    <input
+                      type="text"
+                      required
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 text-right font-mono focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200/40 space-y-3 text-right">
+                <span className="text-xs font-black text-emerald-600 block">👥 حساب الموظف العادي (Employee)</span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500">اسم المستخدم</label>
+                    <input
+                      type="text"
+                      required
+                      value={employeeUsername}
+                      onChange={(e) => setEmployeeUsername(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 text-right focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500">كلمة المرور الجديدة</label>
+                    <input
+                      type="text"
+                      required
+                      value={employeePassword}
+                      onChange={(e) => setEmployeePassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 text-right font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {credentialsSavedMsg && (
+                <p className="text-xs text-emerald-600 font-bold flex items-center gap-1 justify-end animate-pulse">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>تم حفظ وتحديث بيانات حسابات الدخول بنجاح!</span>
+                </p>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-slate-850 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
+                >
+                  حفظ وتأمين حسابات الدخول 🔐
+                </button>
+              </div>
+            </form>
           </div>
 
           {/* Desktop & PWA Installation Guide block */}

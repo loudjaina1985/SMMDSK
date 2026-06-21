@@ -41,6 +41,10 @@ const DEFAULT_SETTINGS: Settings = {
   telegramBotToken: '8712326895:AAF3uMcP6WiIKqbw0_hvemITA76xKRhSwO8',
   telegramChatId: '',
   currency: 'DZD',
+  adminUsername: 'admin',
+  adminPassword: 'admin123',
+  employeeUsername: 'employee',
+  employeePassword: 'staff123',
 };
 
 const DEFAULT_SUBSCRIPTION: Subscription = {
@@ -281,15 +285,48 @@ export default function App() {
           const rawPhone = params.get('phone') || '+213661223344';
           const rawAddress = params.get('address') || 'عنوان شحن بالتيليجرام';
           
+          let parsedItems = [
+            { productId: 'P101', name: 'منتج مستلم ومثبت فورا عبر البوت', quantity: 1, price: 89.9 },
+          ];
+          let parsedTotal = 89.9;
+
+          const itemsDataParam = params.get('itemsData');
+          if (itemsDataParam) {
+            try {
+              const decodedStr = decodeURIComponent(escape(atob(itemsDataParam.replace(/ /g, '+'))));
+              const itemsList = JSON.parse(decodedStr);
+              if (Array.isArray(itemsList) && itemsList.length > 0) {
+                parsedItems = itemsList.map((it: any) => ({
+                  productId: it.productId || 'P101',
+                  name: it.name || 'منتج مستلم',
+                  quantity: Number(it.quantity) || 1,
+                  price: Number(it.price) || 0
+                }));
+              }
+            } catch (err) {
+              console.error('Failed parsing itemsData from telegram URL', err);
+            }
+          }
+
+          const totalParam = params.get('total');
+          if (totalParam) {
+            const num = Number(totalParam);
+            if (!isNaN(num)) {
+              parsedTotal = num;
+            } else {
+              parsedTotal = parsedItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+            }
+          } else {
+            parsedTotal = parsedItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+          }
+
           targetOrder = {
             id: orderId,
             customerName: rawName,
             customerPhone: rawPhone,
             customerAddress: rawAddress,
-            items: [
-              { productId: 'P101', name: 'منتج مستلم ومثبت فورا عبر البوت', quantity: 1, price: 89.9 },
-            ],
-            totalAmount: 89.9,
+            items: parsedItems,
+            totalAmount: parsedTotal,
             status: 'confirmed',
             source: 'telegram',
             createdAt: new Date().toISOString(),
@@ -446,14 +483,19 @@ export default function App() {
     const userClean = loginUsername.trim().toLowerCase();
     const passClean = loginPassword.trim();
 
+    const expectedAdminUser = (state.settings.adminUsername || 'admin').trim().toLowerCase();
+    const expectedAdminPass = (state.settings.adminPassword || 'admin123').trim();
+    const expectedEmpUser = (state.settings.employeeUsername || 'employee').trim().toLowerCase();
+    const expectedEmpPass = (state.settings.employeePassword || 'staff123').trim();
+
     if (loginRole === 'admin') {
-      if (userClean === 'admin' && passClean === 'admin123') {
+      if (userClean === expectedAdminUser && passClean === expectedAdminPass) {
         setState((prev) => ({ ...prev, role: 'admin', isLoggedIn: true }));
       } else {
         setLoginError(t.invalidCredentials);
       }
     } else {
-      if (userClean === 'employee' && passClean === 'staff123') {
+      if (userClean === expectedEmpUser && passClean === expectedEmpPass) {
         setState((prev) => ({ ...prev, role: 'employee', isLoggedIn: true }));
       } else {
         setLoginError(t.invalidCredentials);
@@ -675,9 +717,9 @@ export default function App() {
             let parsedItems: { name: string; qty: number }[] = [];
             const itemLines = cleanText.split('\n');
             itemLines.forEach((line) => {
-              const itemMatch = line.match(/^[-*\s\d.]*([^\nx]+?)\s*x\s*(\d+)/i) || 
-                                line.match(/^[-*\s\d.]*([^\n]+?)\s*عدد\s*(\d+)/i) ||
-                                line.match(/^[-*\s\d.]*([^\n]+?)\s*(\d+)\s*حبات/i);
+              const itemMatch = line.match(/^[-*\s•\d.]*([^\n]+?)\s+x\s*(\d+)(?:\s|\(|$)/i) || 
+                                line.match(/^[-*\s•\d.]*([^\n]+?)\s*عدد\s*(\d+)/i) ||
+                                line.match(/^[-*\s•\d.]*([^\n]+?)\s*(\d+)\s*حبات/i);
               if (itemMatch) {
                 parsedItems.push({
                   name: itemMatch[1].trim(),
@@ -744,12 +786,12 @@ export default function App() {
                   (c) => c.phone.replace(/[^0-9]/g, '') === cleanPhone.replace(/[^0-9]/g, '')
                 );
                 if (!exists) {
-                  customersCopy.push({
-                    id: 'C-' + Math.floor(1000 + Math.random() * 9000),
-                    name: o.customerName.trim(),
-                    phone: o.customerPhone.trim(),
-                    address: o.customerAddress.trim() || 'عنوان توصيل تيليجرام',
-                  });
+                   customersCopy.push({
+                     id: 'C-' + Math.floor(1000 + Math.random() * 9000),
+                     name: o.customerName.trim(),
+                     phone: o.customerPhone.trim(),
+                     address: o.customerAddress.trim() || 'عنوان توصيل تيليجرام',
+                   });
                 }
               }
             });
@@ -764,78 +806,21 @@ export default function App() {
           }
         } else {
           if (isManual) {
-            if (telegramBotToken === '8712326895:AAF3uMcP6WiIKqbw0_hvemITA76xKRhSwO8' && !telegramChatId) {
-              handleMockIncomingOrderSimulation();
-            } else {
-              alert('تحديثات تيليجرام: لا توجد رسائل طلب جديدة حالياً بانتظار استلامها من البوت.');
-            }
+            alert('تحديثات تيليجرام: لا توجد رسائل طلب جديدة حالياً بانتظار استلامها من البوت.');
           }
         }
       } else {
         if (isManual) {
-          if (telegramBotToken === '8712326895:AAF3uMcP6WiIKqbw0_hvemITA76xKRhSwO8' && !telegramChatId) {
-            handleMockIncomingOrderSimulation();
-          } else {
-            alert('لم يتم التمكن من الاتصال بالبوت على خوادم تيليجرام. تأكد من صحة الـ Token الخاص بك.');
-          }
+          alert('لم يتم التمكن من الاتصال بالبوت على خوادم تيليجرام. تأكد من صحة الـ Token الخاص بك.');
         }
       }
     } catch {
       if (isManual) {
-        if (telegramBotToken === '8712326895:AAF3uMcP6WiIKqbw0_hvemITA76xKRhSwO8' && !telegramChatId) {
-          handleMockIncomingOrderSimulation();
-        } else {
-          alert('حدث خطأ فني أثناء جلب بيانات التحديث من تيليجرام.');
-        }
+        alert('حدث خطأ فني أثناء جلب بيانات التحديث من تيليجرام.');
       }
     } finally {
       setIsSyncing(false);
     }
-  };
-
-  // Simulated Telegram bot update so the experience works beautifully without setups too!
-  const handleMockIncomingOrderSimulation = () => {
-    const randomProduct = state.products[Math.floor(Math.random() * state.products.length)] || seedProducts[0];
-    const newSimulatedOrder: Order = {
-      id: 'ORD-' + Math.floor(1000 + Math.random() * 9000),
-      customerName: 'سفيان العبيدي (محاكاة تيليجرام)',
-      customerPhone: '+21698765432',
-      customerAddress: 'حي النصر الثاني، تونس العاصمة',
-      items: [
-        {
-          productId: randomProduct.id,
-          name: randomProduct.name,
-          quantity: 1,
-          price: randomProduct.sellPrice,
-        },
-      ],
-      totalAmount: randomProduct.sellPrice,
-      status: 'pending',
-      source: 'telegram',
-      createdAt: new Date().toISOString(),
-    };
-
-    setState((prev) => {
-      let customersCopy = [...prev.customers];
-      const cleanPhone = newSimulatedOrder.customerPhone.trim();
-      const exists = customersCopy.some(
-        (c) => c.phone.replace(/[^0-9]/g, '') === cleanPhone.replace(/[^0-9]/g, '')
-      );
-      if (!exists) {
-        customersCopy.push({
-          id: 'C-' + Math.floor(1000 + Math.random() * 9000),
-          name: newSimulatedOrder.customerName.trim(),
-          phone: newSimulatedOrder.customerPhone.trim(),
-          address: newSimulatedOrder.customerAddress.trim(),
-        });
-      }
-      return {
-        ...prev,
-        orders: [newSimulatedOrder, ...prev.orders],
-        customers: customersCopy,
-      };
-    });
-    alert('محاكاة سحابة تيليجرام: تم استلام طلب زبون افتراضي جديد وفحصه في المستودع تلقائياً!');
   };
 
   // Background polling to fetch real-time Telegram orders and automatically obtain chat ID
@@ -878,7 +863,7 @@ export default function App() {
   // Render Login authentication Page
   if (!state.isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 flex items-center justify-center p-4" dir="rtl">
+      <div className={`min-h-screen ${state.settings.theme === 'dark' ? 'bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-950' : 'bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400'} flex items-center justify-center p-4`} dir="rtl">
         <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-white/15 flex flex-col items-center">
           <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg mb-4">
             <Lock className="w-7 h-7 text-white" />
